@@ -25,30 +25,11 @@ def fetch_manifest():
         return json.loads(r.read())
 
 
-def fetch_pack(version):
-    """嘗試用 Accept-Encoding: br 抓 pack，讓伺服器自動壓縮。
-    curl/urllib 會透明解壓。"""
-    pack_url = f"{BASE_URL}/pack_{version}.json"
+def fetch_pack(_version):
+    """下載 /transcripts.json.br（Vercel 以 brotli 壓縮提供），解壓後解析 JSON。"""
+    pack_url = f"{BASE_URL}/transcripts.json.br"
     print(f"下載 pack：{pack_url}  (~10MB，請稍候...)")
 
-    req = urllib.request.Request(
-        pack_url,
-        headers={
-            "Accept-Encoding": "gzip, deflate",
-            "User-Agent": "Mozilla/5.0 (research)",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req) as r:
-            data = r.read()
-        return json.loads(data)
-    except Exception as e:
-        print(f"  urllib 失敗：{e}")
-        print("  嘗試 brotli 解碼...")
-        return fetch_pack_brotli(pack_url)
-
-
-def fetch_pack_brotli(pack_url):
     try:
         import brotli
     except ImportError:
@@ -58,15 +39,16 @@ def fetch_pack_brotli(pack_url):
     req = urllib.request.Request(
         pack_url,
         headers={
-            "Accept-Encoding": "br",
             "User-Agent": "Mozilla/5.0 (research)",
+            "Accept-Encoding": "identity",  # 不要 HTTP 層 gzip，直接拿 .br 原始位元組
         },
     )
     with urllib.request.urlopen(req) as r:
         raw = r.read()
 
-    print(f"  收到 {len(raw)/1024/1024:.1f} MB，解壓中...")
+    print(f"  收到 {len(raw)/1024/1024:.1f} MB，brotli 解壓中...")
     data = brotli.decompress(raw)
+    print(f"  解壓後 {len(data)/1024/1024:.1f} MB，解析 JSON...")
     return json.loads(data)
 
 
